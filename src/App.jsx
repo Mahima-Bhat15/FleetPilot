@@ -14,6 +14,7 @@ import { Inspection }       from './screens/Inspection';
 import { Profit }           from './screens/Profit';
 import { usePersistedTab }  from './hooks/usePersistedTab';
 import { useFleetData }     from './hooks/useFleetData';
+import { FleetLogo }        from './components/Logo';
 
 const SCREENS = { SmartDispatch, HOSCompliance, ELDSafety, Alerts, Billing, Inspection, Profit };
 const SCREENS_WITH_RIGHT_PANEL = ['SmartDispatch', 'HOSCompliance'];
@@ -39,7 +40,7 @@ export default function App() {
   if (loading && drivers.length === 0) {
     return (
       <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)', gap: 14 }}>
-        <div style={{ fontSize: 40 }}>🚛</div>
+        <FleetLogo size={64} />
         <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.3px' }}>Syncing Fleet Data</div>
         <div style={{ width: 36, height: 36, border: '3px solid var(--border)', borderTopColor: 'var(--primary)', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
         <div style={{ fontSize: 13, color: 'var(--text3)' }}>Connecting to NavPro...</div>
@@ -80,7 +81,7 @@ export default function App() {
               onDriverSelect={setSelectedDriver} selectedDriver={selectedDriver}
               onBillUpdate={updateBill} onBillAdd={addBill}
               onAlertDismiss={dismissAlert} onDriverUpdate={updateDriver}
-              onRefresh={refresh}
+              onRefresh={refresh} viewMode={viewMode}
             />
           </div>
 

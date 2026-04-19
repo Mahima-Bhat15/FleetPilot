@@ -351,14 +351,121 @@ export const normalizeDocument = (doc) => ({
 const CLAUDE_BASE  = 'https://api.anthropic.com/v1/messages';
 const CLAUDE_MODEL = 'claude-sonnet-4-20250514';
 
+const CLAUDE_HEADERS = {
+  'Content-Type': 'application/json',
+  'x-api-key': '',
+  'anthropic-version': '2023-06-01',
+  'anthropic-dangerous-direct-browser-access': 'true',
+};
+
+const claudeHeaders = () => ({
+  ...CLAUDE_HEADERS,
+  'x-api-key': process.env.REACT_APP_ANTHROPIC_API_KEY || '',
+});
+
 export const askClaude = async (systemPrompt, userMessage, maxTokens = 1000) => {
   const res = await fetch(CLAUDE_BASE, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'x-api-key': process.env.REACT_APP_ANTHROPIC_API_KEY || '', 'anthropic-version': '2023-06-01' },
+    headers: claudeHeaders(),
     body: JSON.stringify({ model: CLAUDE_MODEL, max_tokens: maxTokens, system: systemPrompt, messages: [{ role: 'user', content: userMessage }] }),
   });
   const data = await res.json();
   return data?.content?.[0]?.text || '';
+};
+
+// Single Claude call — sends all drivers + load, returns full ranked array at once.
+// Returns [{ rank, name, score, reasoning }] sorted by rank.
+export const rankDriversForLoad = async (load, drivers) => {
+  const key = process.env.REACT_APP_ANTHROPIC_API_KEY || '';
+  if (!key) throw new Error('NO_ANTHROPIC_KEY');
+
+  const driverSlice = drivers.slice(0, 8).map(d => ({
+    name: d.name,
+    status: d.status || d.work_status,
+    hos: d.hos,
+    deadheadMiles: d.deadheadMiles,
+    fatigue: d.fatigue,
+    ontime: d.ontime,
+    cpm: d.cpm,
+    pattern: d.pattern || null,
+    location: d.pos,
+  }));
+
+  const system = `You are FleetPilot AI, an expert fleet dispatch optimizer. Rank all drivers for a load assignment and return a JSON array.
+
+Return ONLY a valid JSON array — no markdown, no extra text. Each element:
+{"rank":1,"name":"EXACT driver name from input","score":87,"reasoning":"2-3 sentences citing actual numbers: HOS available vs needed, deadhead miles, on-time %, CPM. Be direct and specific."}
+
+Scoring (start 50, clamp 0–100):
+  Available: +20 | Dark/Inactive: -40
+  HOS >= hosNeeded: +15 | HOS < hosNeeded: -25
+  Deadhead <150mi: +12 | 150–250mi: -5 | >250mi: -12
+  On-time >=92%: +10 | CPM <0.87: +8
+  Fatigue Low: +10 | Fatigue High: -15
+  Pattern flag: -12`;
+
+  const userMsg = `Load: ${JSON.stringify({ id: load.id, origin: load.origin, destination: load.destination, distanceMi: load.distanceMi, hosNeeded: load.hosNeeded, revenue: load.revenue, type: load.type })}
+
+Drivers: ${JSON.stringify(driverSlice)}
+
+Return a JSON array ranking all ${driverSlice.length} drivers, best first.`;
+
+  const res = await fetch(CLAUDE_BASE, {
+    method: 'POST',
+    headers: claudeHeaders(),
+    body: JSON.stringify({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 2000,
+      system,
+      messages: [{ role: 'user', content: userMsg }],
+    }),
+  });
+
+  if (!res.ok) {
+    const errText = await res.text();
+    throw new Error(`Claude ${res.status}: ${errText}`);
+  }
+
+  const data = await res.json();
+  const text = data?.content?.[0]?.text || '[]';
+
+  // Strip any accidental markdown fences
+  const cleaned = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+  return JSON.parse(cleaned);
+};
+
+// Single call — summarizes entire fleet state into a concise brief with concern items.
+// Returns { summary: string, concerns: [{level: 'critical'|'warning'|'info', text: string}] }
+export const getFleetBrief = async (dispatchLoads, inTransitLoads, driverAlerts) => {
+  const key = process.env.REACT_APP_ANTHROPIC_API_KEY || '';
+  if (!key) throw new Error('NO_ANTHROPIC_KEY');
+
+  const system = `You are FleetPilot AI, a fleet operations assistant. Analyze fleet status and return a concise brief.
+Return ONLY valid JSON — no markdown, no extra text:
+{"summary":"One sentence fleet overview with key numbers","concerns":[{"level":"critical|warning|info","text":"Concise actionable insight, max 15 words, include names/IDs/numbers"}]}
+Rules: Max 4 concerns. Prioritize critical first. Skip minor items. Be specific — use driver names, load IDs, hours, percentages.`;
+
+  const payload = {
+    pending: dispatchLoads.map(l => ({ id: l.id, route: `${l.origin.split(',')[0]}→${l.destination.split(',')[0]}`, urgency: l.urgency || 'Normal', pickup: l.pickupTime, revenue: l.revenue })),
+    inTransit: inTransitLoads.map(l => ({ id: l.id, driver: l.driverName, status: l.status, progress: l.progress + '%', eta: l.eta, location: l.currentLocation })),
+    driverAlerts,
+  };
+
+  const res = await fetch(CLAUDE_BASE, {
+    method: 'POST',
+    headers: claudeHeaders(),
+    body: JSON.stringify({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 500,
+      system,
+      messages: [{ role: 'user', content: JSON.stringify(payload) }],
+    }),
+  });
+
+  if (!res.ok) throw new Error(`Claude ${res.status}`);
+  const data = await res.json();
+  const raw = (data?.content?.[0]?.text || '{}').replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+  return JSON.parse(raw);
 };
 
 export const getDispatchRanking = async (load, drivers) => {

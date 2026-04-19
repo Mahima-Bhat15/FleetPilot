@@ -1,5 +1,6 @@
 // src/components/Topbar.jsx
 import React, { useState, useEffect } from 'react';
+import { FleetLogo } from './Logo';
 
 export const Topbar = ({ onVoicePress, viewMode, onViewModeChange }) => {
   const [time, setTime] = useState('');
@@ -20,7 +21,7 @@ export const Topbar = ({ onVoicePress, viewMode, onViewModeChange }) => {
     <div style={{ background: 'var(--primary)', height: 56, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 20px', flexShrink: 0, zIndex: 100 }}>
       {/* Logo */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-        <div style={{ width: 32, height: 32, background: '#fff', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16 }}>🚛</div>
+        <FleetLogo size={36} />
         <div>
           <div style={{ fontSize: 16, fontWeight: 700, color: '#fff', letterSpacing: '-0.3px', lineHeight: 1.2 }}>FleetPilot</div>
           <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.6)', marginTop: 1 }}>Intelligence Layer · NavPro</div>
