@@ -9,6 +9,8 @@ export const Billing = ({ bills: liveBills, onBillAdd, onBillUpdate }) => {
     liveBills && liveBills.length > 0 ? liveBills : BILLS
   );
   const [uploading, setUploading] = useState(false);
+  const [contactBill, setContactBill] = useState(null);
+  const [reviewBillData, setReviewBillData] = useState(null);
   const fileRef = useRef(null);
 
   // Sync when live documents update from data hook
@@ -66,9 +68,22 @@ export const Billing = ({ bills: liveBills, onBillAdd, onBillUpdate }) => {
   };
 
   const approveBill = (id) => {
+    const bill = bills.find((item) => item.id === id);
     setBills(prev => prev.map(b => b.id === id ? { ...b, status: 'approved' } : b));
     if (onBillUpdate) onBillUpdate(id, { status: 'approved' });
+    if (bill?.type === 'DVIR') {
+      alert('✅ Approved\n\nDVIR archived and marked compliant.\n\n🤖 AI Actions:\n• Inspection record filed\n• Driver document linked\n• Maintenance note retained\n• Audit trail updated');
+      return;
+    }
     alert('✅ Approved\n\nInvoice generated and sent to broker.\n\n🤖 AI Actions:\n• Invoice created\n• Customer notified\n• Accounting updated\n• Receipt archived');
+  };
+
+  const reviewBill = (bill) => {
+    setReviewBillData(bill);
+  };
+
+  const contactDriver = (bill) => {
+    setContactBill(bill);
   };
 
   const pendingBills  = bills.filter(b => b.status === 'pending');
@@ -103,7 +118,15 @@ export const Billing = ({ bills: liveBills, onBillAdd, onBillUpdate }) => {
           <Divider style={{ margin: '12px 0' }} />
 
           <SectionLabel label={`Pending Review (${pendingBills.length})`} />
-          {pendingBills.map(bill => <BillItem key={bill.id} bill={bill} onApprove={() => approveBill(bill.id)} />)}
+          {pendingBills.map(bill => (
+            <BillItem
+              key={bill.id}
+              bill={bill}
+              onApprove={() => approveBill(bill.id)}
+              onReview={() => reviewBill(bill)}
+              onContactDriver={() => contactDriver(bill)}
+            />
+          ))}
 
           {approvedBills.length > 0 && (
             <>
@@ -114,11 +137,25 @@ export const Billing = ({ bills: liveBills, onBillAdd, onBillUpdate }) => {
           )}
         </div>
       </Card>
+
+      {contactBill && (
+        <ContactDriverModal
+          bill={contactBill}
+          onClose={() => setContactBill(null)}
+        />
+      )}
+
+      {reviewBillData && (
+        <DocumentFolderModal
+          bill={reviewBillData}
+          onClose={() => setReviewBillData(null)}
+        />
+      )}
     </div>
   );
 };
 
-const BillItem = ({ bill, onApprove, approved }) => (
+const BillItem = ({ bill, onApprove, onReview, onContactDriver, approved }) => (
   <div style={{
     background: approved ? 'var(--green-bg)' : 'var(--surface)',
     border: `1px solid ${approved ? 'var(--green-border)' : 'var(--border)'}`,
@@ -128,7 +165,9 @@ const BillItem = ({ bill, onApprove, approved }) => (
       <div>
         <span style={{ fontSize: 10, color: 'var(--text3)', fontFamily: 'var(--font-mono)' }}>{bill.id} · {bill.truck}</span>
       </div>
-      <span style={{ fontSize: 18, fontWeight: 700, color: 'var(--primary)' }}>${bill.amount.toFixed(2)}</span>
+      <span style={{ fontSize: 18, fontWeight: 700, color: 'var(--primary)' }}>
+        {typeof bill.amount === 'number' ? `$${bill.amount.toFixed(2)}` : bill.type}
+      </span>
     </div>
     <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)', marginBottom: 2 }}>{bill.driver}</div>
     <div style={{ fontSize: 11, color: 'var(--text2)', marginBottom: 7 }}>{bill.type} · {bill.location} · {bill.date}</div>
@@ -139,13 +178,278 @@ const BillItem = ({ bill, onApprove, approved }) => (
 
     {!approved ? (
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-        <button onClick={onApprove} style={{ background: 'var(--green-bg)', border: '1px solid var(--green-border)', borderRadius: 'var(--radius-md)', padding: '5px 11px', fontSize: 11, fontWeight: 600, color: 'var(--green-text)', cursor: 'pointer' }}>✓ Approve & Invoice</button>
-        {['Review', 'Contact Driver'].map(label => (
-          <button key={label} style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', padding: '5px 11px', fontSize: 11, fontWeight: 500, color: 'var(--text2)', cursor: 'pointer' }}>{label}</button>
-        ))}
+        <button onClick={onApprove} style={{ background: 'var(--green-bg)', border: '1px solid var(--green-border)', borderRadius: 'var(--radius-md)', padding: '5px 11px', fontSize: 11, fontWeight: 600, color: 'var(--green-text)', cursor: 'pointer' }}>
+          {bill.type === 'DVIR' ? '✓ Approve & Archive' : '✓ Approve & Invoice'}
+        </button>
+        <button onClick={onReview} style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', padding: '5px 11px', fontSize: 11, fontWeight: 500, color: 'var(--text2)', cursor: 'pointer' }}>Review</button>
+        <button onClick={onContactDriver} style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', padding: '5px 11px', fontSize: 11, fontWeight: 500, color: 'var(--text2)', cursor: 'pointer' }}>Contact Driver</button>
       </div>
     ) : (
-      <div style={{ alignSelf: 'flex-start', display: 'inline-block', background: 'var(--green-bg)', border: '1px solid var(--green-border)', borderRadius: 'var(--radius-full)', padding: '3px 10px', fontSize: 11, color: 'var(--green-text)', fontWeight: 600 }}>✓ Invoiced</div>
+      <div style={{ alignSelf: 'flex-start', display: 'inline-block', background: 'var(--green-bg)', border: '1px solid var(--green-border)', borderRadius: 'var(--radius-full)', padding: '3px 10px', fontSize: 11, color: 'var(--green-text)', fontWeight: 600 }}>
+        {bill.type === 'DVIR' ? '✓ Archived' : '✓ Invoiced'}
+      </div>
     )}
+  </div>
+);
+
+const ContactDriverModal = ({ bill, onClose }) => {
+  const phone = bill.contact?.phone || 'No phone on file';
+  const email = bill.contact?.email || 'No email on file';
+
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: 'fixed',
+        inset: 0,
+        background: 'rgba(15, 23, 42, 0.48)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 20,
+        zIndex: 1000,
+        backdropFilter: 'blur(4px)',
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          width: 'min(560px, 100%)',
+          background: 'var(--surface)',
+          border: '1px solid var(--border)',
+          borderRadius: 'var(--radius-xl)',
+          boxShadow: 'var(--shadow-lg)',
+          overflow: 'hidden',
+        }}
+      >
+        <div style={{ padding: '18px 20px', borderBottom: '1px solid var(--border)', background: 'linear-gradient(135deg, var(--blue-bg), var(--surface))' }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                <span style={{ fontSize: 18 }}>📞</span>
+                <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--text)' }}>Driver Contact</div>
+                <Chip label={bill.type} variant="blue" />
+              </div>
+              <div style={{ fontSize: 13, color: 'var(--text2)' }}>
+                Reach out to confirm document details before archive or billing action.
+              </div>
+            </div>
+            <button
+              onClick={onClose}
+              style={{
+                width: 34,
+                height: 34,
+                borderRadius: '50%',
+                background: 'var(--surface)',
+                border: '1px solid var(--border)',
+                color: 'var(--text2)',
+                fontSize: 18,
+                lineHeight: 1,
+              }}
+            >
+              ×
+            </button>
+          </div>
+        </div>
+
+        <div style={{ padding: 20 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1.1fr 0.9fr', gap: 12, marginBottom: 16 }}>
+            <div style={{ background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: 14 }}>
+              <div style={{ fontSize: 11, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.7px', marginBottom: 6 }}>Driver</div>
+              <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--text)', marginBottom: 4 }}>{bill.driver}</div>
+              <div style={{ fontSize: 13, color: 'var(--text2)' }}>{bill.truck} · {bill.location}</div>
+            </div>
+            <div style={{ background: 'var(--green-bg)', border: '1px solid var(--green-border)', borderRadius: 'var(--radius-lg)', padding: 14 }}>
+              <div style={{ fontSize: 11, color: 'var(--green-text)', textTransform: 'uppercase', letterSpacing: '0.7px', marginBottom: 6 }}>Document Status</div>
+              <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--green-text)', marginBottom: 4 }}>
+                {bill.status === 'approved' ? 'Archived' : 'Pending Review'}
+              </div>
+              <div style={{ fontSize: 13, color: 'var(--text2)' }}>{bill.date}</div>
+            </div>
+          </div>
+
+          <div style={{ display: 'grid', gap: 10, marginBottom: 16 }}>
+            <div style={{ background: 'var(--blue-bg)', border: '1px solid var(--blue-border)', borderRadius: 'var(--radius-md)', padding: 12 }}>
+              <div style={{ fontSize: 10, color: 'var(--blue-text)', textTransform: 'uppercase', letterSpacing: '0.7px', marginBottom: 4 }}>Phone</div>
+              <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--text)' }}>{phone}</div>
+            </div>
+            <div style={{ background: 'var(--purple-bg)', border: '1px solid #ddd6fe', borderRadius: 'var(--radius-md)', padding: 12 }}>
+              <div style={{ fontSize: 10, color: 'var(--purple)', textTransform: 'uppercase', letterSpacing: '0.7px', marginBottom: 4 }}>Email</div>
+              <div style={{ fontSize: 15, fontWeight: 500, color: 'var(--text)' }}>{email}</div>
+            </div>
+          </div>
+
+          <div style={{ background: 'var(--amber-bg)', border: '1px solid var(--amber-border)', borderRadius: 'var(--radius-lg)', padding: 14, marginBottom: 18 }}>
+            <div style={{ fontSize: 10, color: 'var(--amber-text)', textTransform: 'uppercase', letterSpacing: '0.7px', marginBottom: 6 }}>Suggested Message</div>
+            <div style={{ fontSize: 14, color: 'var(--text)', lineHeight: 1.6 }}>
+              Please review your {bill.type} from {bill.date}. Dispatch needs confirmation on the document details before final processing.
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, flexWrap: 'wrap' }}>
+            <button
+              onClick={onClose}
+              style={{
+                background: 'var(--bg)',
+                border: '1px solid var(--border)',
+                borderRadius: 'var(--radius-md)',
+                padding: '9px 14px',
+                fontSize: 12,
+                fontWeight: 600,
+                color: 'var(--text2)',
+              }}
+            >
+              Close
+            </button>
+            <a
+              href={phone !== 'No phone on file' ? `tel:${phone.replace(/[^\d+]/g, '')}` : undefined}
+              onClick={(e) => {
+                if (phone === 'No phone on file') e.preventDefault();
+              }}
+              style={{
+                textDecoration: 'none',
+                background: 'var(--green-bg)',
+                border: '1px solid var(--green-border)',
+                borderRadius: 'var(--radius-md)',
+                padding: '9px 14px',
+                fontSize: 12,
+                fontWeight: 700,
+                color: 'var(--green-text)',
+              }}
+            >
+              Call Driver
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const DocumentFolderModal = ({ bill, onClose }) => (
+  <div
+    onClick={onClose}
+    style={{
+      position: 'fixed',
+      inset: 0,
+      background: 'rgba(15, 23, 42, 0.48)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: 20,
+      zIndex: 1000,
+      backdropFilter: 'blur(4px)',
+    }}
+  >
+    <div
+      onClick={(e) => e.stopPropagation()}
+      style={{
+        width: 'min(620px, 100%)',
+        background: 'var(--surface)',
+        border: '1px solid var(--border)',
+        borderRadius: 'var(--radius-xl)',
+        boxShadow: 'var(--shadow-lg)',
+        overflow: 'hidden',
+      }}
+    >
+      <div style={{ padding: '18px 20px', borderBottom: '1px solid var(--border)', background: 'linear-gradient(135deg, var(--surface2), var(--blue-bg))' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+              <span style={{ fontSize: 18 }}>📁</span>
+              <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--text)' }}>Document Folder</div>
+              <Chip label="documents" variant="purple" />
+            </div>
+            <div style={{ fontSize: 13, color: 'var(--text2)' }}>
+              Review the stored file for this driver before final processing.
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            style={{
+              width: 34,
+              height: 34,
+              borderRadius: '50%',
+              background: 'var(--surface)',
+              border: '1px solid var(--border)',
+              color: 'var(--text2)',
+              fontSize: 18,
+              lineHeight: 1,
+            }}
+          >
+            ×
+          </button>
+        </div>
+      </div>
+
+      <div style={{ padding: 20 }}>
+        <div style={{ background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: 14, marginBottom: 14 }}>
+          <div style={{ fontSize: 10, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.7px', marginBottom: 6 }}>Folder Path</div>
+          <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)', fontFamily: 'var(--font-mono)' }}>/documents</div>
+        </div>
+
+        <div style={{ border: '1px solid var(--blue-border)', background: 'var(--blue-bg)', borderRadius: 'var(--radius-lg)', padding: 14, marginBottom: 14 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 8 }}>
+            <div>
+              <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text)' }}>{bill.fileName || 'Attached document'}</div>
+              <div style={{ fontSize: 12, color: 'var(--text2)' }}>{bill.driver} · {bill.truck} · {bill.date}</div>
+            </div>
+            <Chip label={bill.type} variant="blue" />
+          </div>
+          <div style={{ fontSize: 13, color: 'var(--text2)', lineHeight: 1.6 }}>
+            {bill.ocr}
+          </div>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 10, marginBottom: 18 }}>
+          <div style={{ background: 'var(--green-bg)', border: '1px solid var(--green-border)', borderRadius: 'var(--radius-md)', padding: 12 }}>
+            <div style={{ fontSize: 10, color: 'var(--green-text)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 4 }}>Status</div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--green-text)' }}>{bill.status === 'approved' ? 'Archived' : 'Pending Review'}</div>
+          </div>
+          <div style={{ background: 'var(--amber-bg)', border: '1px solid var(--amber-border)', borderRadius: 'var(--radius-md)', padding: 12 }}>
+            <div style={{ fontSize: 10, color: 'var(--amber-text)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 4 }}>Location</div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)' }}>{bill.location}</div>
+          </div>
+          <div style={{ background: 'var(--purple-bg)', border: '1px solid #ddd6fe', borderRadius: 'var(--radius-md)', padding: 12 }}>
+            <div style={{ fontSize: 10, color: 'var(--purple)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 4 }}>Driver</div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)' }}>{bill.driver}</div>
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, flexWrap: 'wrap' }}>
+          <button
+            onClick={onClose}
+            style={{
+              background: 'var(--bg)',
+              border: '1px solid var(--border)',
+              borderRadius: 'var(--radius-md)',
+              padding: '9px 14px',
+              fontSize: 12,
+              fontWeight: 600,
+              color: 'var(--text2)',
+            }}
+          >
+            Close
+          </button>
+          <a
+            href={bill.fileUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              textDecoration: 'none',
+              background: 'var(--primary)',
+              border: '1px solid var(--primary)',
+              borderRadius: 'var(--radius-md)',
+              padding: '9px 14px',
+              fontSize: 12,
+              fontWeight: 700,
+              color: '#fff',
+            }}
+          >
+            Open PDF
+          </a>
+        </div>
+      </div>
+    </div>
   </div>
 );

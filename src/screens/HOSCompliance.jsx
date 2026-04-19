@@ -1,10 +1,11 @@
 // src/screens/HOSCompliance.jsx
 import React, { useState } from 'react';
 import { hosColor } from '../utils/theme';
-import { Card, CardHeader, CardTitle, Chip, ApiTag, Divider, SectionLabel } from '../components/UI';
+import { Card, CardHeader, CardTitle, Chip, ApiTag, Divider } from '../components/UI';
 import { DRIVERS, HOS_RULES } from '../data/mockData';
 
 export const HOSCompliance = ({ drivers: liveDrivers, onDriverSelect }) => {
+  const [rulesOpen, setRulesOpen] = useState(false);
   const [expandedRule, setExpandedRule] = useState(null);
   const driverList = liveDrivers && liveDrivers.length > 0 ? liveDrivers : DRIVERS;
 
@@ -12,47 +13,66 @@ export const HOSCompliance = ({ drivers: liveDrivers, onDriverSelect }) => {
     <div style={{ flex: 1, overflow: 'auto', background: 'var(--bg)', padding: 12 }}>
       {/* FMCSA Rules Accordion */}
       <Card>
-        <CardHeader
-          left={<CardTitle icon="⏱" title="FMCSA HOS Rules" chip={<Chip label="49 CFR Part 395" variant="blue" />} />}
-          right={<ApiTag label="ELD feed · §395" />}
-        />
-        <div style={{ padding: 12 }}>
-          {HOS_RULES.map((rule, idx) => {
-            const isOpen = expandedRule === idx;
-            return (
-              <div key={idx} style={{ marginBottom: 6, border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', overflow: 'hidden' }}>
-                <button
-                  onClick={() => setExpandedRule(isOpen ? null : idx)}
-                  style={{
-                    width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                    padding: 12, background: isOpen ? 'var(--blue-bg)' : 'var(--surface)',
-                    borderBottom: isOpen ? '1px solid var(--blue-border)' : 'none',
-                    cursor: 'pointer', textAlign: 'left',
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1 }}>
-                    <span style={{ fontSize: 20, width: 28 }}>{rule.icon}</span>
-                    <div>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', marginBottom: 2 }}>{rule.title}</div>
-                      <div style={{ fontSize: 10, color: 'var(--primary)', fontFamily: 'var(--font-mono)', fontWeight: 600 }}>{rule.regulation}</div>
-                    </div>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    {!isOpen && <span style={{ fontSize: 11, color: 'var(--text3)', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{rule.summary}</span>}
-                    <span style={{ fontSize: 20, color: 'var(--text3)', transform: isOpen ? 'rotate(90deg)' : 'none', transition: 'transform 0.2s' }}>›</span>
-                  </div>
-                </button>
-                {isOpen && (
-                  <div style={{ background: 'var(--blue-bg)', padding: 12 }}>
-                    <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)', marginBottom: 4 }}>{rule.summary}</div>
-                    <Divider style={{ margin: '6px 0' }} />
-                    <div style={{ fontSize: 12, color: 'var(--text2)', lineHeight: 1.6 }}>{rule.detail}</div>
-                  </div>
-                )}
+        <button
+          onClick={() => setRulesOpen(prev => !prev)}
+          style={{
+            width: '100%',
+            background: 'transparent',
+            border: 'none',
+            padding: 0,
+            cursor: 'pointer',
+            textAlign: 'left',
+          }}
+        >
+          <CardHeader
+            left={<CardTitle icon="⏱" title="FMCSA HOS Rules" chip={<Chip label="49 CFR Part 395" variant="blue" />} />}
+            right={(
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <ApiTag label="ELD feed · §395" />
+                <span style={{ fontSize: 22, color: 'var(--text3)', transform: rulesOpen ? 'rotate(90deg)' : 'none', transition: 'transform 0.2s' }}>›</span>
               </div>
-            );
-          })}
-        </div>
+            )}
+          />
+        </button>
+        {rulesOpen && (
+          <div style={{ padding: 12, borderTop: '1px solid var(--border)', background: 'var(--surface)' }}>
+            {HOS_RULES.map((rule, idx) => {
+              const isOpen = expandedRule === idx;
+              return (
+                <div key={idx} style={{ marginBottom: 8, border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', overflow: 'hidden', background: 'var(--surface)' }}>
+                  <button
+                    onClick={() => setExpandedRule(isOpen ? null : idx)}
+                    style={{
+                      width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                      padding: 12, background: isOpen ? 'var(--blue-bg)' : 'var(--surface)',
+                      borderBottom: isOpen ? '1px solid var(--blue-border)' : 'none',
+                      cursor: 'pointer', textAlign: 'left',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1 }}>
+                      <span style={{ fontSize: 20, width: 28 }}>{rule.icon}</span>
+                      <div>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', marginBottom: 2 }}>{rule.title}</div>
+                        <div style={{ fontSize: 10, color: 'var(--primary)', fontFamily: 'var(--font-mono)', fontWeight: 600 }}>{rule.regulation}</div>
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      {!isOpen && <span style={{ fontSize: 11, color: 'var(--text3)', maxWidth: 240, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{rule.summary}</span>}
+                      <span style={{ fontSize: 20, color: 'var(--text3)', transform: isOpen ? 'rotate(90deg)' : 'none', transition: 'transform 0.2s' }}>›</span>
+                    </div>
+                  </button>
+                  {isOpen && (
+                    <div style={{ background: 'var(--blue-bg)', padding: 12 }}>
+                      <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)', marginBottom: 4 }}>{rule.summary}</div>
+                      <Divider style={{ margin: '6px 0' }} />
+                      <div style={{ fontSize: 12, color: 'var(--text2)', lineHeight: 1.6 }}>{rule.detail}</div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
       </Card>
 
       {/* Live HOS Table */}

@@ -13,8 +13,8 @@ export const Inspection = () => {
     alert(`📋 Reading Inspection Report\n\nFile: ${file.name}\n\n🤖 AI is extracting:\n• Vehicle ID & driver\n• Inspection date & provider\n• Pass/Fail per item\n• Notes & recommendations\n\nProcessed in 3 seconds!`);
     const newInsp = {
       id: `INV-NEW-${Date.now()}`,
-      truck: 'TRK-002',
-      driver: 'Maria Rodriguez',
+      truck: 'Uploaded Unit',
+      driver: 'Uploaded Driver',
       date: new Date().toISOString().split('T')[0],
       provider: 'Uploaded Report',
       score: 88,
@@ -25,7 +25,14 @@ export const Inspection = () => {
     e.target.value = '';
   };
 
-  const handleAction = (action, truck) => alert(`${action} for ${truck} — team notified.`);
+  const handleAction = (action, inspection) => {
+    if (action === 'Download PDF' && inspection.fileUrl) {
+      window.open(inspection.fileUrl, '_blank', 'noopener,noreferrer');
+      return;
+    }
+
+    alert(`${action} for ${inspection.truck} — team notified.`);
+  };
 
   return (
     <div style={{ flex: 1, overflow: 'auto', background: 'var(--bg)', padding: 12 }}>
@@ -98,10 +105,10 @@ const InspCard = ({ insp, onAction }) => {
 
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
         {['Download PDF', 'Notify Maintenance'].map(label => (
-          <button key={label} onClick={() => onAction(label, insp.truck)} style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', padding: '5px 10px', fontSize: 10, color: 'var(--text2)', fontWeight: 500, cursor: 'pointer' }}>{label}</button>
+          <button key={label} onClick={() => onAction(label, insp)} style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', padding: '5px 10px', fontSize: 10, color: 'var(--text2)', fontWeight: 500, cursor: 'pointer' }}>{label}</button>
         ))}
         {isCritical && (
-          <button onClick={() => onAction('Block Dispatch', insp.truck)} style={{ background: 'var(--red-bg)', border: '1px solid var(--red-border)', borderRadius: 'var(--radius-md)', padding: '5px 10px', fontSize: 10, fontWeight: 600, color: 'var(--red-text)', cursor: 'pointer' }}>🚫 Block Dispatch</button>
+          <button onClick={() => onAction('Block Dispatch', insp)} style={{ background: 'var(--red-bg)', border: '1px solid var(--red-border)', borderRadius: 'var(--radius-md)', padding: '5px 10px', fontSize: 10, fontWeight: 600, color: 'var(--red-text)', cursor: 'pointer' }}>🚫 Block Dispatch</button>
         )}
       </div>
     </div>
