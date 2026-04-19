@@ -2,10 +2,8 @@
 import React from 'react';
 import { riskGrade } from '../utils/theme';
 import { Card, CardHeader, CardTitle, Chip, StatBox, SectionLabel, Divider, DriverAvatar } from '../components/UI';
-import { DRIVERS } from '../data/mockData';
-
 export const Profit = ({ drivers: liveDrivers }) => {
-  const driverList = liveDrivers && liveDrivers.length > 0 ? liveDrivers : DRIVERS;
+  const driverList = liveDrivers || [];
   const handleBonus = (driver, bonus) => {
     alert(`🏆 Bonus Approved!\n\n$${bonus} bonus approved for ${driver}.\n\n🤖 FleetPilot Actions:\n• Driver notified via NavPro app\n• Payroll system updated\n• Savings logged to fleet analytics`);
   };

@@ -1,6 +1,30 @@
 // src/components/VoiceModal.jsx
 import React, { useState, useEffect } from 'react';
-import { VOICE_COMMANDS, VOICE_RESPONSES } from '../data/mockData';
+const VOICE_COMMANDS = [
+  { label: '"What\'s my fleet status?"', key: 'status' },
+  { label: '"Best driver for Phoenix pickup?"', key: 'best' },
+  { label: '"Any HOS violations?"', key: 'hos' },
+  { label: '"What bills need approval?"', key: 'bill' },
+  { label: '"Show me dark trucks"', key: 'dark' },
+  { label: '"Who has the lowest cost per mile?"', key: 'cpm' },
+  { label: '"What loads are unassigned?"', key: 'loads' },
+  { label: '"Is any driver fatigued?"', key: 'fatigue' },
+  { label: '"Assign Dave to LD-47392"', key: 'assign' },
+  { label: '"What\'s the total revenue today?"', key: 'revenue' },
+];
+
+const VOICE_RESPONSES = {
+  status: '6 trucks active. Dave Thompson available for Load LD-47392. Carlos Martinez and Mike Chen have HOS warnings. Lisa Anderson is dark — immediate action required.',
+  best: 'Best driver for Phoenix pickup: Dave Thompson, Score 95. 9.5h HOS, 124 deadhead miles, $1,245 estimated fuel, no pattern flags. Ripple analysis clear for tomorrow.',
+  hos: 'Two HOS warnings: Carlos Martinez will breach at 11:20 AM — needs Flying J Exit 201 now. Mike Chen has 2.1h remaining with 2.8h route left — guaranteed violation.',
+  bill: 'Three bills pending. Dave Thompson fuel $245.80 — OCR verified, ready to approve. Maria Rodriguez maintenance $89.50 pending review. Sarah Johnson $312.40 already invoiced.',
+  dark: 'Lisa Anderson on TRK-006 has been dark 41 minutes. Last known position I-10 Exit 201, Casa Grande AZ. Recommend calling immediately and dispatching roadside assistance.',
+  cpm: 'Dave Thompson has the lowest cost per mile at $0.84. Maria Rodriguez is second at $0.86. Fleet average is $0.89. Lisa Anderson is highest at $0.93.',
+  loads: 'Three loads unassigned: LD-47392 Phoenix to Dallas 1067 miles, LD-47410 Albuquerque to Denver 452 miles, and LD-47400 Tucson to Chicago 1745 miles. LD-47392 is most urgent — pickup tomorrow 8 AM.',
+  fatigue: 'Mike Chen is high fatigue — only 2.1h HOS, last rest 9 hours ago. Carlos Martinez is medium fatigue. All other drivers are low fatigue. Recommend no new assignments for Mike.',
+  assign: 'Assigning Dave Thompson to Load LD-47392. Route pushed to NavPro driver app. ETA for customer: Tomorrow 6:14 PM. Driver briefing message sent.',
+  revenue: "Today's total revenue is $24,500 across 6 loads. Average cost per mile is $0.87. Net margin estimated at 18.4%. Highest earning load: LD-47392 at $2,890.",
+};
 
 export const VoiceModal = ({ visible, onClose }) => {
   const [status, setStatus] = useState('idle');

@@ -2,17 +2,12 @@
 import React, { useState } from 'react';
 import { hosColor } from '../utils/theme';
 import { Card, CardHeader, CardTitle, Chip, ApiTag, Btn, StatBox, SectionLabel, HOSBar, Divider } from '../components/UI';
-import { DRIVERS, LOADS } from '../data/mockData';
-
-const LOAD = LOADS[0];
-
-export const SmartDispatch = ({ drivers: liveDrivers, onDriverSelect }) => {
+export const SmartDispatch = ({ drivers: liveDrivers, loads, onDriverSelect }) => {
   const [assigned, setAssigned] = useState(false);
 
-  // Use real drivers from API, fall back to mock for demo
-  const driverList = liveDrivers && liveDrivers.length > 0 ? liveDrivers : DRIVERS;
+  const driverList = liveDrivers || [];
+  const LOAD = loads?.[0] || null;
 
-  // Build driver scores from real data — score based on availability + load status
   const DRIVER_SCORES = driverList.slice(0, 5).map((driver, idx) => ({
     driver,
     score: driver.work_status === 'AVAILABLE' ? Math.max(30, 95 - idx * 15) : Math.max(20, 50 - idx * 10),
@@ -31,7 +26,7 @@ export const SmartDispatch = ({ drivers: liveDrivers, onDriverSelect }) => {
   return (
     <div style={{ flex: 1, overflow: 'auto', background: 'var(--bg)', padding: 12 }}>
       <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
-        <StatBox value={String(LOADS.length)}                                               label="Loads Pending"   accent="var(--primary)" valueColor="var(--primary)" />
+        <StatBox value={String(loads?.length ?? 0)}                                          label="Loads Pending"   accent="var(--primary)" valueColor="var(--primary)" />
         <StatBox value={String(driverList.filter(d => d.work_status === 'AVAILABLE' || d.status === 'Available').length)} label="Drivers Avail." accent="var(--green)"   valueColor="var(--green)" />
         <StatBox value={String(driverList.filter(d => (d.hos || 11) < 4).length)}           label="HOS Alerts"      accent="var(--amber)"   valueColor="var(--amber)" />
         <StatBox value={String(driverList.filter(d => d.status === 'Dark' || d.status === 'Inactive').length)} label="Inactive"  accent="var(--red)"     valueColor="var(--red)" />
@@ -64,27 +59,33 @@ export const SmartDispatch = ({ drivers: liveDrivers, onDriverSelect }) => {
         />
         <div style={{ padding: 12 }}>
           {/* Load detail */}
-          <div style={{ background: 'var(--blue-bg)', border: '1px solid var(--blue-border)', borderRadius: 'var(--radius-md)', padding: 12, marginBottom: 12 }}>
-            <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 6 }}>LOAD {LOAD.id} · Needs Assignment</div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
-              <span style={{ fontSize: 16, fontWeight: 700, color: 'var(--text)' }}>{LOAD.origin}</span>
-              <span style={{ fontSize: 18, color: 'var(--text3)' }}>→</span>
-              <span style={{ fontSize: 16, fontWeight: 700, color: 'var(--text)' }}>{LOAD.destination}</span>
+          {LOAD ? (
+            <div style={{ background: 'var(--blue-bg)', border: '1px solid var(--blue-border)', borderRadius: 'var(--radius-md)', padding: 12, marginBottom: 12 }}>
+              <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 6 }}>LOAD {LOAD.id} · Needs Assignment</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+                <span style={{ fontSize: 16, fontWeight: 700, color: 'var(--text)' }}>{LOAD.origin}</span>
+                <span style={{ fontSize: 18, color: 'var(--text3)' }}>→</span>
+                <span style={{ fontSize: 16, fontWeight: 700, color: 'var(--text)' }}>{LOAD.destination}</span>
+              </div>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
+                {[['Pickup', LOAD.pickupTime], ['Distance', `${LOAD.distanceMi?.toLocaleString()} mi`], ['HOS Needed', `${LOAD.hosNeeded}h total`, 'var(--amber)'], ['Est. Revenue', `$${LOAD.revenue?.toLocaleString()}`]].map(([label, value, color]) => (
+                  <div key={label} style={{ background: '#fff', borderRadius: 6, border: '1px solid var(--border)', padding: 7, flex: 1, minWidth: '20%' }}>
+                    <div style={{ fontSize: 9, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 2 }}>{label}</div>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: color || 'var(--text)' }}>{value}</div>
+                  </div>
+                ))}
+              </div>
+              <div style={{ background: '#fff', borderRadius: 6, border: '1px solid var(--border)', padding: 8 }}>
+                <span style={{ fontSize: 11, color: 'var(--text2)', lineHeight: 1.6 }}>
+                  <strong>FMCSA Rule Check: </strong>{LOAD.distanceMi}mi route requires 2-day operation with mandatory 10h off-duty break (§395.3). Driver must have ≥11h today + 10h rest + remaining hours tomorrow.
+                </span>
+              </div>
             </div>
-            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
-              {[['Pickup', LOAD.pickupTime], ['Distance', `${LOAD.distanceMi.toLocaleString()} mi`], ['HOS Needed', `${LOAD.hosNeeded}h total`, 'var(--amber)'], ['Est. Revenue', `$${LOAD.revenue.toLocaleString()}`]].map(([label, value, color]) => (
-                <div key={label} style={{ background: '#fff', borderRadius: 6, border: '1px solid var(--border)', padding: 7, flex: 1, minWidth: '20%' }}>
-                  <div style={{ fontSize: 9, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 2 }}>{label}</div>
-                  <div style={{ fontSize: 12, fontWeight: 600, color: color || 'var(--text)' }}>{value}</div>
-                </div>
-              ))}
+          ) : (
+            <div style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', padding: 20, marginBottom: 12, textAlign: 'center' }}>
+              <div style={{ fontSize: 13, color: 'var(--text3)' }}>No loads available — syncing from NavPro...</div>
             </div>
-            <div style={{ background: '#fff', borderRadius: 6, border: '1px solid var(--border)', padding: 8 }}>
-              <span style={{ fontSize: 11, color: 'var(--text2)', lineHeight: 1.6 }}>
-                <strong>FMCSA Rule Check: </strong>{LOAD.distanceMi}mi route requires 2-day operation with mandatory 10h off-duty break (§395.3). Driver must have ≥11h today + 10h rest + remaining hours tomorrow.
-              </span>
-            </div>
-          </div>
+          )}
 
           <SectionLabel label="🤖 AI Driver Ranking — HOS · Location · Cost · Fatigue · Deadhead · Patterns · Ripple" />
 

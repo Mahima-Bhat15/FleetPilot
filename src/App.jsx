@@ -35,6 +35,18 @@ export default function App() {
     );
   }
 
+  if (loading && drivers.length === 0) {
+    return (
+      <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)', gap: 14 }}>
+        <div style={{ fontSize: 40 }}>🚛</div>
+        <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.3px' }}>Syncing Fleet Data</div>
+        <div style={{ width: 36, height: 36, border: '3px solid var(--border)', borderTopColor: 'var(--primary)', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+        <div style={{ fontSize: 13, color: 'var(--text3)' }}>Connecting to NavPro...</div>
+        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+      </div>
+    );
+  }
+
   const ActiveScreen = SCREENS[activeTab] || SmartDispatch;
   const showRightPanel = SCREENS_WITH_RIGHT_PANEL.includes(activeTab);
 

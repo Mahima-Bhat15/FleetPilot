@@ -1,8 +1,6 @@
 // src/screens/Alerts.jsx
 import React, { useState, useEffect } from 'react';
 import { StatBox, SectionLabel } from '../components/UI';
-import { ALERTS_DATA } from '../data/mockData';
-
 const TYPE_CONFIG = {
   crit: { bg: 'var(--red-bg)',   border: 'var(--red-border)',   label: 'Critical', color: 'var(--red)',   textColor: 'var(--red-text)' },
   warn: { bg: 'var(--amber-bg)', border: 'var(--amber-border)', label: 'Warning',  color: 'var(--amber)', textColor: 'var(--amber-text)' },
@@ -10,9 +8,7 @@ const TYPE_CONFIG = {
 };
 
 export const Alerts = ({ alerts: liveAlerts, onAlertDismiss }) => {
-  const [alerts, setAlerts] = useState(
-    liveAlerts && liveAlerts.length > 0 ? liveAlerts : ALERTS_DATA
-  );
+  const [alerts, setAlerts] = useState(liveAlerts || []);
   const [resolved, setResolved] = useState([]);
 
   // Sync when live alerts update from the data hook
