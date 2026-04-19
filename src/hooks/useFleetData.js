@@ -5,6 +5,8 @@ import {
   fetchDrivers, fetchVehicles, fetchDocuments, fetchDriverTrackingToday,
   normalizeDriver, normalizeVehicle, normalizeDocument,
 } from '../data/api';
+import { DEMO_DRIVERS_MODIFIED, DEMO_DRIVERS_ADDITIONAL, DEMO_ALERTS, DEMO_INSPECTIONS, DEMO_LOADS } from '../data/mockData';
+
 const POLL_INTERVAL_MS = 30_000;
 const SIM_TICK_MS      = 3_000;
 const SIM_STEP         = 0.0008;
@@ -20,12 +22,13 @@ function moveToward(current, target) {
   };
 }
 
-export const useFleetData = () => {
+export const useFleetData = (viewMode = 'live') => {
   const [drivers,      setDrivers]      = useState([]);
   const [loads,        setLoads]        = useState([]);
   const [alerts,       setAlerts]       = useState([]);
   const [bills,        setBills]        = useState([]);
   const [vehicles,     setVehicles]     = useState([]);
+  const [inspections,  setInspections]  = useState([]);
   const [loading,      setLoading]      = useState(false);
   const [error,        setError]        = useState(null);
   const [lastSync,     setLastSync]     = useState(null);
@@ -72,6 +75,17 @@ export const useFleetData = () => {
 
   const refresh = useCallback(async (silent = false) => {
     const token = process.env.REACT_APP_NAVPRO_JWT_TOKEN;
+    
+    // In demo mode, use mock data
+    if (viewMode === 'demo') {
+      setIsLive(false);
+      setAlerts(DEMO_ALERTS);
+      setInspections(DEMO_INSPECTIONS);
+      setLoads(DEMO_LOADS);
+      setLastSync(new Date());
+      return;
+    }
+
     if (!token) {
       setIsLive(false);
       setLastSync(new Date());
@@ -110,7 +124,7 @@ export const useFleetData = () => {
     } finally {
       if (!silent) setLoading(false);
     }
-  }, [seedRealLocations]);
+  }, [seedRealLocations, viewMode]);
 
   // Initial fetch + polling
   useEffect(() => { refresh(); }, [refresh]);
@@ -135,11 +149,27 @@ export const useFleetData = () => {
   }, []); // intentionally runs once; simTargetsRef is a ref so always current
 
   // Merge simulated lat/lng into the drivers array before returning
-  const driversWithSim = drivers.map(d => {
-    const key    = d.navpro_id || d.id;
-    const simLoc = simLocations[key];
-    return simLoc ? { ...d, lat: simLoc.lat, lng: simLoc.lng } : d;
-  });
+  // In demo mode, combine live data with demo data
+  let finalDrivers;
+  
+  if (viewMode === 'demo') {
+    // In demo mode, combine live drivers with modified demo drivers + additional demo drivers
+    const liveDriversWithSim = drivers.map(d => {
+      const key    = d.navpro_id || d.id;
+      const simLoc = simLocations[key];
+      return simLoc ? { ...d, lat: simLoc.lat, lng: simLoc.lng } : d;
+    });
+    
+    // Combine: live drivers + modified demo drivers + additional demo drivers
+    finalDrivers = [...liveDriversWithSim, ...DEMO_DRIVERS_MODIFIED, ...DEMO_DRIVERS_ADDITIONAL];
+  } else {
+    // In live mode, use real drivers with simulated locations
+    finalDrivers = drivers.map(d => {
+      const key    = d.navpro_id || d.id;
+      const simLoc = simLocations[key];
+      return simLoc ? { ...d, lat: simLoc.lat, lng: simLoc.lng } : d;
+    });
+  }
 
   const updateBill   = useCallback((id, patch) => setBills(prev => prev.map(b => b.id === id ? { ...b, ...patch } : b)), []);
   const addBill      = useCallback((bill) => setBills(prev => [bill, ...prev]), []);
@@ -147,8 +177,8 @@ export const useFleetData = () => {
   const updateDriver = useCallback((id, patch) => setDrivers(prev => prev.map(d => d.id === id ? { ...d, ...patch } : d)), []);
 
   return {
-    drivers: driversWithSim,
-    loads, alerts, bills, vehicles,
+    drivers: finalDrivers,
+    loads, alerts, bills, vehicles, inspections,
     loading, error, lastSync, isLive,
     refresh, updateBill, addBill, dismissAlert, updateDriver,
   };

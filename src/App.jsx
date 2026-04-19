@@ -16,11 +16,12 @@ import { usePersistedTab }  from './hooks/usePersistedTab';
 import { useFleetData }     from './hooks/useFleetData';
 
 const SCREENS = { SmartDispatch, HOSCompliance, ELDSafety, Alerts, Billing, Inspection, Profit };
-const SCREENS_WITH_RIGHT_PANEL = ['SmartDispatch', 'HOSCompliance', 'Alerts', 'Billing', 'Inspection', 'Profit'];
+const SCREENS_WITH_RIGHT_PANEL = ['SmartDispatch', 'HOSCompliance'];
 
 export default function App() {
+  const [viewMode, setViewMode] = useState('live'); // 'live' or 'demo'
   const { activeTab, navigate, isLoaded } = usePersistedTab('SmartDispatch');
-  const { drivers, loads, alerts, bills, vehicles, loading, error, lastSync, isLive, refresh, updateBill, addBill, dismissAlert, updateDriver } = useFleetData();
+  const { drivers, loads, alerts, bills, vehicles, inspections, loading, error, lastSync, isLive, refresh, updateBill, addBill, dismissAlert, updateDriver } = useFleetData(viewMode);
   const [voiceVisible,   setVoiceVisible]   = useState(false);
   const [selectedDriver, setSelectedDriver] = useState(null);
 
@@ -52,7 +53,11 @@ export default function App() {
 
   return (
     <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-      <Topbar onVoicePress={() => setVoiceVisible(true)} isLive={isLive} />
+      <Topbar 
+        onVoicePress={() => setVoiceVisible(true)} 
+        viewMode={viewMode}
+        onViewModeChange={setViewMode}
+      />
       <LiveSyncBar isLive={isLive} loading={loading} lastSync={lastSync} error={error} onRefresh={refresh} />
 
       {/* Main layout: sidebar + content */}
@@ -71,7 +76,7 @@ export default function App() {
         <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
             <ActiveScreen
-              drivers={drivers} loads={loads} alerts={alerts} bills={bills} vehicles={vehicles}
+              drivers={drivers} loads={loads} alerts={alerts} bills={bills} vehicles={vehicles} inspections={inspections}
               onDriverSelect={setSelectedDriver} selectedDriver={selectedDriver}
               onBillUpdate={updateBill} onBillAdd={addBill}
               onAlertDismiss={dismissAlert} onDriverUpdate={updateDriver}

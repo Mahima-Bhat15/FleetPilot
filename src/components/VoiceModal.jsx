@@ -1,5 +1,5 @@
 // src/components/VoiceModal.jsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 const VOICE_COMMANDS = [
   { label: '"What\'s my fleet status?"', key: 'status' },
   { label: '"Best driver for Phoenix pickup?"', key: 'best' },
@@ -30,34 +30,134 @@ export const VoiceModal = ({ visible, onClose }) => {
   const [status, setStatus] = useState('idle');
   const [transcript, setTranscript] = useState('');
   const [response, setResponse] = useState('');
+  const [isListening, setIsListening] = useState(false);
+  const recognitionRef = useRef(null);
 
   useEffect(() => {
-    if (!visible) { setStatus('idle'); setTranscript(''); setResponse(''); }
+    if (!visible) { 
+      setStatus('idle'); 
+      setTranscript(''); 
+      setResponse(''); 
+      setIsListening(false);
+      if (recognitionRef.current) {
+        recognitionRef.current.stop();
+      }
+    }
   }, [visible]);
+
+  // Initialize speech recognition
+  useEffect(() => {
+    if (typeof window !== 'undefined' && ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window)) {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      recognitionRef.current = new SpeechRecognition();
+      recognitionRef.current.continuous = false;
+      recognitionRef.current.interimResults = false;
+      recognitionRef.current.lang = 'en-US';
+
+      recognitionRef.current.onresult = (event) => {
+        const spokenText = event.results[0][0].transcript;
+        setTranscript(spokenText);
+        setStatus('thinking');
+        setIsListening(false);
+        
+        // Find matching command
+        const matchedCommand = VOICE_COMMANDS.find(cmd => 
+          spokenText.toLowerCase().includes(cmd.label.toLowerCase().replace(/"/g, '').substring(0, 10))
+        );
+        
+        setTimeout(() => {
+          const responseText = matchedCommand 
+            ? VOICE_RESPONSES[matchedCommand.key] 
+            : "I didn't understand that command. Please try one of the quick commands below.";
+          setResponse(responseText);
+          setStatus('responding');
+          
+          // Speak the response
+          if ('speechSynthesis' in window) {
+            const utterance = new SpeechSynthesisUtterance(responseText);
+            utterance.rate = 1.1;
+            utterance.pitch = 1.0;
+            window.speechSynthesis.speak(utterance);
+          }
+        }, 1500);
+      };
+
+      recognitionRef.current.onerror = (event) => {
+        console.error('Speech recognition error:', event.error);
+        setIsListening(false);
+        setStatus('idle');
+        if (event.error === 'no-speech') {
+          setTranscript('No speech detected. Please try again.');
+        }
+      };
+
+      recognitionRef.current.onend = () => {
+        setIsListening(false);
+      };
+    }
+
+    return () => {
+      if (recognitionRef.current) {
+        recognitionRef.current.stop();
+      }
+    };
+  }, []);
+
+  const startListening = () => {
+    if (recognitionRef.current && !isListening) {
+      setStatus('listening');
+      setTranscript('');
+      setResponse('');
+      setIsListening(true);
+      recognitionRef.current.start();
+    } else if (!recognitionRef.current) {
+      alert('Speech recognition is not supported in your browser. Please use Chrome, Edge, or Safari.');
+    }
+  };
 
   const runCommand = (key, label) => {
     setStatus('listening');
     setTranscript('');
     setResponse('');
-    setTimeout(() => { setTranscript(label.replace(/"/g, '')); setStatus('thinking'); }, 800);
-    setTimeout(() => { setResponse(VOICE_RESPONSES[key] || 'Processing...'); setStatus('responding'); }, 2000);
+    setTimeout(() => { 
+      setTranscript(label.replace(/"/g, '')); 
+      setStatus('thinking'); 
+    }, 800);
+    setTimeout(() => { 
+      const responseText = VOICE_RESPONSES[key] || 'Processing...';
+      setResponse(responseText); 
+      setStatus('responding');
+      
+      // Speak the response
+      if ('speechSynthesis' in window) {
+        const utterance = new SpeechSynthesisUtterance(responseText);
+        utterance.rate = 1.1;
+        utterance.pitch = 1.0;
+        window.speechSynthesis.speak(utterance);
+      }
+    }, 2000);
   };
 
   const micColor = status === 'listening' ? 'var(--red)' : status === 'thinking' ? 'var(--amber)' : status === 'responding' ? 'var(--green)' : 'var(--primary)';
-  const statusLabels = { idle: 'Tap a command below to try it', listening: 'Listening...', thinking: 'AI analyzing fleet data...', responding: 'Response:' };
+  const statusLabels = { 
+    idle: 'Tap microphone to speak or use quick commands', 
+    listening: 'Listening...', 
+    thinking: 'AI analyzing fleet data...', 
+    responding: 'Response:' 
+  };
 
   if (!visible) return null;
 
   return (
     <div style={{
       position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)',
-      display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
-      zIndex: 1000,
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      zIndex: 1000, padding: 20,
     }} onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
       <div style={{
-        background: 'var(--surface)', borderRadius: '20px 20px 0 0',
-        padding: 20, paddingBottom: 32, width: '100%', maxWidth: 600,
-        maxHeight: '80vh', display: 'flex', flexDirection: 'column',
+        background: 'var(--surface)', borderRadius: '20px',
+        padding: 20, width: '100%', maxWidth: 600,
+        maxHeight: '90vh', display: 'flex', flexDirection: 'column',
         boxShadow: 'var(--shadow-lg)',
       }}>
         {/* Header */}
@@ -71,17 +171,22 @@ export const VoiceModal = ({ visible, onClose }) => {
 
         {/* Mic */}
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: 16 }}>
-          <div style={{
-            width: 80, height: 80, borderRadius: '50%',
-            border: `2px solid ${micColor}`, background: micColor + '22',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 8,
-            transition: 'all 0.3s', transform: status === 'listening' || status === 'thinking' ? 'scale(1.1)' : 'scale(1)',
-          }}>
+          <div 
+            onClick={startListening}
+            style={{
+              width: 80, height: 80, borderRadius: '50%',
+              border: `2px solid ${micColor}`, background: micColor + '22',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 8,
+              transition: 'all 0.3s', 
+              transform: status === 'listening' || status === 'thinking' ? 'scale(1.1)' : 'scale(1)',
+              cursor: status === 'idle' ? 'pointer' : 'default',
+            }}
+          >
             <div style={{ width: 56, height: 56, borderRadius: '50%', background: micColor, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <span style={{ fontSize: 24 }}>🎙️</span>
             </div>
           </div>
-          <span style={{ fontSize: 14, fontWeight: 600, color: micColor }}>{statusLabels[status]}</span>
+          <span style={{ fontSize: 14, fontWeight: 600, color: micColor, textAlign: 'center' }}>{statusLabels[status]}</span>
         </div>
 
         {transcript && (
@@ -116,7 +221,14 @@ export const VoiceModal = ({ visible, onClose }) => {
         </div>
 
         {status !== 'idle' && (
-          <button onClick={() => { setStatus('idle'); setTranscript(''); setResponse(''); }}
+          <button onClick={() => { 
+            setStatus('idle'); 
+            setTranscript(''); 
+            setResponse(''); 
+            if (window.speechSynthesis) {
+              window.speechSynthesis.cancel();
+            }
+          }}
             style={{
               alignSelf: 'center', marginTop: 14, background: 'var(--blue-bg)',
               border: '1px solid var(--blue-border)', borderRadius: 'var(--radius-full)',

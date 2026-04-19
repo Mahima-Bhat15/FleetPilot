@@ -1,7 +1,7 @@
 // src/components/Topbar.jsx
 import React, { useState, useEffect } from 'react';
 
-export const Topbar = ({ onVoicePress, isLive }) => {
+export const Topbar = ({ onVoicePress, viewMode, onViewModeChange }) => {
   const [time, setTime] = useState('');
   useEffect(() => {
     const update = () => {
@@ -27,20 +27,60 @@ export const Topbar = ({ onVoicePress, isLive }) => {
         </div>
       </div>
 
-      {/* KPIs */}
-      <div style={{ display: 'flex', gap: 28 }}>
-        {[
-          { value: '6',      label: 'Trucks' },
-          { value: '4',      label: 'Transit' },
-          { value: '$24.5K', label: 'Revenue' },
-          { value: '$0.87',  label: 'Avg CPM' },
-          { value: '2',      label: 'HOS Alerts', color: '#fcd34d' },
-        ].map(kpi => (
-          <div key={kpi.label} style={{ textAlign: 'center' }}>
-            <div style={{ fontSize: 18, fontWeight: 700, color: kpi.color || '#fff', lineHeight: 1.2 }}>{kpi.value}</div>
-            <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.6)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{kpi.label}</div>
-          </div>
-        ))}
+      {/* View Mode Toggle */}
+      <div style={{ display: 'flex', gap: 8, background: 'rgba(0,0,0,0.2)', borderRadius: 8, padding: 4 }}>
+        <button
+          onClick={() => onViewModeChange('live')}
+          style={{
+            background: viewMode === 'live' ? 'rgba(0,200,83,0.3)' : 'transparent',
+            border: viewMode === 'live' ? '1px solid rgba(0,200,83,0.6)' : '1px solid transparent',
+            borderRadius: 6,
+            padding: '6px 16px',
+            color: '#fff',
+            fontSize: 12,
+            fontWeight: 600,
+            cursor: 'pointer',
+            transition: 'all 0.2s',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6
+          }}
+          onMouseEnter={e => {
+            if (viewMode !== 'live') e.target.style.background = 'rgba(255,255,255,0.1)';
+          }}
+          onMouseLeave={e => {
+            if (viewMode !== 'live') e.target.style.background = 'transparent';
+          }}
+        >
+          <span style={{ fontSize: 10 }}>{viewMode === 'live' ? '●' : '○'}</span>
+          Live
+        </button>
+        <button
+          onClick={() => onViewModeChange('demo')}
+          style={{
+            background: viewMode === 'demo' ? 'rgba(59,130,246,0.3)' : 'transparent',
+            border: viewMode === 'demo' ? '1px solid rgba(59,130,246,0.6)' : '1px solid transparent',
+            borderRadius: 6,
+            padding: '6px 16px',
+            color: '#fff',
+            fontSize: 12,
+            fontWeight: 600,
+            cursor: 'pointer',
+            transition: 'all 0.2s',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6
+          }}
+          onMouseEnter={e => {
+            if (viewMode !== 'demo') e.target.style.background = 'rgba(255,255,255,0.1)';
+          }}
+          onMouseLeave={e => {
+            if (viewMode !== 'demo') e.target.style.background = 'transparent';
+          }}
+        >
+          <span style={{ fontSize: 10 }}>{viewMode === 'demo' ? '●' : '○'}</span>
+          Demo
+        </button>
       </div>
 
       {/* Right controls */}
@@ -54,9 +94,6 @@ export const Topbar = ({ onVoicePress, isLive }) => {
           onMouseEnter={e => e.target.style.background = 'rgba(255,255,255,0.25)'}
           onMouseLeave={e => e.target.style.background = 'rgba(255,255,255,0.15)'}
         >🎤 Ask Fleet</button>
-        <div style={{ background: isLive ? 'rgba(0,200,83,0.2)' : 'rgba(255,255,255,0.12)', border: `1px solid ${isLive ? 'rgba(0,200,83,0.5)' : 'rgba(255,255,255,0.2)'}`, borderRadius: 20, padding: '3px 10px', fontSize: 10, color: '#fff', fontWeight: 500 }}>
-          {isLive ? '● NavPro Live' : '○ Demo Mode'}
-        </div>
       </div>
     </div>
   );

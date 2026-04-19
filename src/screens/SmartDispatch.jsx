@@ -1,25 +1,164 @@
 // src/screens/SmartDispatch.jsx
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { hosColor } from '../utils/theme';
-import { Card, CardHeader, CardTitle, Chip, ApiTag, Btn, StatBox, SectionLabel, HOSBar, Divider } from '../components/UI';
+import { Card, CardHeader, CardTitle, Chip, Btn, StatBox, SectionLabel, HOSBar } from '../components/UI';
+
 export const SmartDispatch = ({ drivers: liveDrivers, loads, onDriverSelect }) => {
   const [assigned, setAssigned] = useState(false);
 
   const driverList = liveDrivers || [];
   const LOAD = loads?.[0] || null;
 
-  const DRIVER_SCORES = driverList.slice(0, 5).map((driver, idx) => ({
-    driver,
-    score: driver.work_status === 'AVAILABLE' ? Math.max(30, 95 - idx * 15) : Math.max(20, 50 - idx * 10),
-    fuelEst: 1000 + idx * 150,
-    rank: idx + 1,
-    ripple: null,
-    flag: driver.work_status === 'INACTIVE' ? `Driver is currently ${driver.status}` : null,
-    note: driver.work_status === 'AVAILABLE' ? `✓ Available · ${driver.pos || 'Location unknown'}` : null,
-  }));
+  // Generate AI reasoning for each driver
+  const DRIVER_SCORES = useMemo(() => {
+    if (!LOAD) return [];
+    
+    return driverList.slice(0, 8).map((driver, idx) => {
+      const isAvailable = driver.work_status === 'AVAILABLE' || driver.status === 'Available';
+      const isDark = driver.status === 'Dark' || driver.status === 'Inactive';
+      const hasEnoughHOS = (driver.hos || 0) >= (LOAD.hosNeeded || 0);
+      const lowDeadhead = (driver.deadheadMiles || 0) < 200;
+      const goodOnTime = (driver.ontime || 0) >= 90;
+      const lowFatigue = driver.fatigue === 'Low';
+      const noPattern = !driver.pattern;
+      
+      // Calculate score based on multiple factors
+      let score = 50;
+      if (isAvailable) score += 20;
+      if (hasEnoughHOS) score += 15;
+      if (lowDeadhead) score += 10;
+      if (goodOnTime) score += 10;
+      if (lowFatigue) score += 10;
+      if (noPattern) score += 5;
+      if (driver.cpm < 0.88) score += 10;
+      
+      // Penalties
+      if (isDark) score -= 40;
+      if (!hasEnoughHOS) score -= 20;
+      if (driver.fatigue === 'High') score -= 15;
+      if (driver.pattern) score -= 10;
+      
+      score = Math.max(20, Math.min(100, score));
+      
+      // Generate AI reasoning
+      let reasoning = '';
+      let flag = null;
+      let note = null;
+      
+      if (isDark) {
+        reasoning = `❌ Driver unavailable - no GPS signal. Cannot assign until location confirmed.`;
+        flag = `Driver is currently ${driver.status}`;
+      } else if (!isAvailable) {
+        reasoning = `⚠️ Driver currently ${driver.status}. Not available for immediate assignment.`;
+        flag = `Driver is currently ${driver.status}`;
+      } else if (!hasEnoughHOS) {
+        reasoning = `⚠️ Insufficient HOS: ${driver.hos}h available, ${LOAD.hosNeeded}h needed. Would require rest stop or relay.`;
+      } else if (driver.fatigue === 'High') {
+        reasoning = `⚠️ High fatigue level detected. Recommend mandatory rest before assignment to ensure safety compliance.`;
+      } else if (driver.pattern) {
+        reasoning = `⚠️ Performance pattern detected: ${driver.pattern}. Monitor closely if assigned.`;
+      } else {
+        // Positive reasoning for good candidates
+        const reasons = [];
+        if (isAvailable) reasons.push('Available now');
+        if (hasEnoughHOS) reasons.push(`${driver.hos}h HOS (${LOAD.hosNeeded}h needed)`);
+        if (lowDeadhead) reasons.push(`${driver.deadheadMiles}mi deadhead`);
+        if (goodOnTime) reasons.push(`${driver.ontime}% on-time`);
+        if (lowFatigue) reasons.push('Low fatigue');
+        if (driver.cpm < 0.88) reasons.push(`$${driver.cpm} CPM (below avg)`);
+        
+        reasoning = `✓ ${reasons.join(' · ')}`;
+        note = `✓ Available · ${driver.pos || 'Location confirmed'}`;
+      }
+      
+      return {
+        driver,
+        score,
+        fuelEst: 1000 + idx * 150,
+        rank: idx + 1,
+        ripple: null,
+        flag,
+        note,
+        reasoning,
+      };
+    }).sort((a, b) => b.score - a.score).map((item, idx) => ({ ...item, rank: idx + 1 }));
+  }, [driverList, LOAD]);
+
+  // Generate dynamic morning intelligence based on actual data
+  const morningIntelligence = useMemo(() => {
+    const items = [];
+    
+    // Dark trucks
+    const darkTrucks = driverList.filter(d => d.status === 'Dark' || d.status === 'Inactive');
+    if (darkTrucks.length > 0) {
+      darkTrucks.forEach(d => {
+        items.push({
+          color: 'var(--red)',
+          text: `${d.name} (${d.id}) dark ${d.lastSeen || 'unknown time'} — last known: ${d.pos}. Action required.`
+        });
+      });
+    }
+    
+    // HOS warnings
+    const hosWarnings = driverList.filter(d => (d.hos || 0) < 4 && d.status !== 'Dark');
+    if (hosWarnings.length > 0) {
+      hosWarnings.forEach(d => {
+        items.push({
+          color: 'var(--amber)',
+          text: `${d.name} (${d.id}) — ${d.hos}h HOS remaining. FMCSA §395.3: monitor for compliance.`
+        });
+      });
+    }
+    
+    // High fatigue drivers
+    const fatiguedDrivers = driverList.filter(d => d.fatigue === 'High');
+    if (fatiguedDrivers.length > 0) {
+      fatiguedDrivers.forEach(d => {
+        items.push({
+          color: 'var(--amber)',
+          text: `${d.name} (${d.id}) — High fatigue detected. Recommend rest period before new assignment.`
+        });
+      });
+    }
+    
+    // Best load assignment
+    if (LOAD && DRIVER_SCORES.length > 0) {
+      const bestDriver = DRIVER_SCORES[0];
+      if (bestDriver.score >= 80) {
+        items.push({
+          color: 'var(--primary)',
+          text: `Load ${LOAD.id} (${LOAD.origin.split(',')[0]}→${LOAD.destination.split(',')[0]}, ${LOAD.distanceMi}mi) — Best match: ${bestDriver.driver.name} (Score ${bestDriver.score}).`
+        });
+      } else {
+        items.push({
+          color: 'var(--amber)',
+          text: `Load ${LOAD.id} needs assignment. No optimal driver available (best score: ${bestDriver.score}). Consider relay or delay.`
+        });
+      }
+    }
+    
+    // Available drivers count
+    const availableCount = driverList.filter(d => d.status === 'Available' || d.work_status === 'AVAILABLE').length;
+    if (availableCount > 0) {
+      items.push({
+        color: 'var(--green)',
+        text: `${availableCount} driver${availableCount > 1 ? 's' : ''} available for immediate assignment.`
+      });
+    }
+    
+    // If no items, add default message
+    if (items.length === 0) {
+      items.push({
+        color: 'var(--primary)',
+        text: 'All systems operational. Fleet ready for dispatch.'
+      });
+    }
+    
+    return items;
+  }, [driverList, LOAD, DRIVER_SCORES]);
 
   const handleAssign = (driverName) => {
-    alert(`✅ Assignment Confirmed\n\n${driverName} assigned to Load LD-47392.\n\n🤖 AI Actions:\n• Route pushed to NavPro driver app\n• ETA: Tomorrow 6:14 PM sent to customer\n• Driver briefing message sent\n• Tomorrow's board analyzed — no conflicts`);
+    alert(`✅ Assignment Confirmed\n\n${driverName} assigned to Load ${LOAD?.id || 'LD-47392'}.\n\n🤖 AI Actions:\n• Route pushed to NavPro driver app\n• ETA: Tomorrow 6:14 PM sent to customer\n• Driver briefing message sent\n• Tomorrow's board analyzed — no conflicts`);
     setAssigned(true);
   };
 
@@ -37,14 +176,8 @@ export const SmartDispatch = ({ drivers: liveDrivers, loads, onDriverSelect }) =
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, flexWrap: 'wrap' }}>
           <div style={{ width: 28, height: 28, background: 'var(--primary)', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14 }}>⚡</div>
           <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--primary)', flex: 1 }}>FleetPilot Morning Intelligence — NavPro Data Layer</span>
-          <ApiTag label="GET /v1/drivers · /v1/trips" />
         </div>
-        {[
-          { color: 'var(--red)',    text: 'Lisa W. (TRK-006) dark 41 mins — last NavPro ping Exit 201, I-10. Action required.' },
-          { color: 'var(--amber)',  text: 'Carlos M. (TRK-003) — 3.2h HOS left, 194mi to Albuquerque. FMCSA §395.3: must rest by 11:20 AM.' },
-          { color: 'var(--amber)',  text: 'Assigning Maria R. to Load #0083 today leaves Chicago flatbed (7 AM tomorrow) uncovered.' },
-          { color: 'var(--primary)',text: 'Load LD-47392 (Phoenix→Dallas, 1,067mi) needs assignment. Best 24h choice: Dave Thompson.' },
-        ].map((item, i) => (
+        {morningIntelligence.map((item, i) => (
           <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 5, alignItems: 'flex-start' }}>
             <div style={{ width: 6, height: 6, borderRadius: '50%', background: item.color, marginTop: 5, flexShrink: 0 }} />
             <span style={{ fontSize: 12, color: 'var(--text2)', flex: 1, lineHeight: 1.6 }}>{item.text}</span>
@@ -55,7 +188,6 @@ export const SmartDispatch = ({ drivers: liveDrivers, loads, onDriverSelect }) =
       <Card>
         <CardHeader
           left={<CardTitle icon="🎯" title="Smart Dispatch" chip={<Chip label="AI Powered" variant="blue" />} />}
-          right={<ApiTag label="NavPro /v1/trips" />}
         />
         <div style={{ padding: 12 }}>
           {/* Load detail */}
@@ -77,7 +209,7 @@ export const SmartDispatch = ({ drivers: liveDrivers, loads, onDriverSelect }) =
               </div>
               <div style={{ background: '#fff', borderRadius: 6, border: '1px solid var(--border)', padding: 8 }}>
                 <span style={{ fontSize: 11, color: 'var(--text2)', lineHeight: 1.6 }}>
-                  <strong>FMCSA Rule Check: </strong>{LOAD.distanceMi}mi route requires 2-day operation with mandatory 10h off-duty break (§395.3). Driver must have ≥11h today + 10h rest + remaining hours tomorrow.
+                  <strong>FMCSA Rule Check: </strong>{LOAD.distanceMi}mi route requires {LOAD.hosNeeded}h drive time. Driver must have sufficient HOS remaining (§395.3).
                 </span>
               </div>
             </div>
@@ -99,7 +231,7 @@ export const SmartDispatch = ({ drivers: liveDrivers, loads, onDriverSelect }) =
 };
 
 const DriverRankCard = ({ item, onAssign, onSelect }) => {
-  const { driver, score, fuelEst, rank, ripple, flag, note } = item;
+  const { driver, score, fuelEst, rank, ripple, flag, note, reasoning } = item;
   const isTop = rank === 1;
   const scoreColor = score >= 90 ? 'var(--green)' : score >= 65 ? 'var(--amber)' : 'var(--red)';
   const hosClr = hosColor(driver.hos);
@@ -141,11 +273,25 @@ const DriverRankCard = ({ item, onAssign, onSelect }) => {
         <span style={{ fontSize: 11, fontWeight: 600, fontFamily: 'var(--font-mono)', color: hosClr, minWidth: 28 }}>{driver.hos}h</span>
       </div>
 
+      {/* AI Reasoning */}
+      {reasoning && (
+        <div style={{ 
+          background: score >= 80 ? 'var(--green-bg)' : score >= 60 ? 'var(--blue-bg)' : 'var(--amber-bg)', 
+          border: `1px solid ${score >= 80 ? 'var(--green-border)' : score >= 60 ? 'var(--blue-border)' : 'var(--amber-border)'}`, 
+          borderRadius: 5, 
+          padding: 7, 
+          marginBottom: 6 
+        }}>
+          <div style={{ fontSize: 10, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 2 }}>🤖 AI Analysis</div>
+          <div style={{ fontSize: 11, color: 'var(--text2)', lineHeight: 1.5 }}>{reasoning}</div>
+        </div>
+      )}
+
       {note && <div style={{ background: '#fff', borderRadius: 5, border: '1px solid var(--green-border)', padding: 7, marginBottom: 6, fontSize: 10, color: 'var(--green-text)' }}>{note}</div>}
       {flag && <div style={{ background: 'var(--red-bg)', border: '1px solid var(--red-border)', borderRadius: 5, padding: 6, marginTop: 4, fontSize: 10, color: 'var(--red-text)' }}>⚑ {flag}</div>}
       {ripple && <div style={{ background: 'var(--amber-bg)', border: '1px solid var(--amber-border)', borderRadius: 5, padding: 6, marginTop: 4, fontSize: 10, color: 'var(--amber-text)' }}>⚠ Ripple Risk: {ripple}</div>}
 
-      {isTop && (
+      {isTop && score >= 80 && (
         <div style={{ display: 'flex', gap: 7, marginTop: 8 }} onClick={e => e.stopPropagation()}>
           <Btn label={`Assign ${driver.name.split(' ')[0]} → One Tap`} onClick={onAssign} variant="primary" size="sm" />
           <Btn label="View Profile" onClick={onSelect} variant="ghost" size="sm" />

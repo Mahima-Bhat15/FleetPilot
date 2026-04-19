@@ -1,11 +1,15 @@
 // src/screens/Inspection.jsx
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, Chip, ApiTag, SectionLabel, Divider } from '../components/UI';
-import { INSPECTIONS } from '../data/mockData';
 
-export const Inspection = () => {
-  const [inspections, setInspections] = useState(INSPECTIONS);
+export const Inspection = ({ inspections: liveInspections }) => {
+  const [inspections, setInspections] = useState(liveInspections || []);
   const fileRef = useRef(null);
+
+  // Sync when live inspections update from the data hook
+  useEffect(() => {
+    if (liveInspections && liveInspections.length > 0) setInspections(liveInspections);
+  }, [liveInspections]);
 
   const handleUpload = (e) => {
     const file = e.target.files?.[0];
@@ -39,7 +43,6 @@ export const Inspection = () => {
       <Card>
         <CardHeader
           left={<CardTitle icon="🔍" title="Vehicle Inspection — Third-Party Integration" chip={<Chip label="FMCSA §396.11" variant="blue" />} />}
-          right={<ApiTag label="DVIR · PrePass API" />}
         />
         <div style={{ padding: 12 }}>
           <input ref={fileRef} type="file" accept="image/*,.pdf" style={{ display: 'none' }} onChange={handleUpload} />

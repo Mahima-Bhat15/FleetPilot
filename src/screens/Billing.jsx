@@ -94,7 +94,6 @@ export const Billing = ({ bills: liveBills, onBillAdd, onBillUpdate }) => {
       <Card>
         <CardHeader
           left={<CardTitle icon="💰" title="Billing & Document Automation" chip={<Chip label="AI Powered" variant="green" />} />}
-          right={<ApiTag label="NavPro /v1/documents" />}
         />
         <div style={{ padding: 12 }}>
           {/* Upload zone */}

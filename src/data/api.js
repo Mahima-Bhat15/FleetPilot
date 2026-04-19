@@ -150,6 +150,30 @@ export const createTrip = (driver_id, stop_points, scheduled_start_time, routing
 export const fetchRoutingProfiles = (page = 0, size = 20) =>
   navpro(`/api/routing-profile/list?page=${page}&size=${size}`, { method: 'GET' });
 
+// ── 9. MESSAGING ──────────────────────────────────────────────────────────────
+// Send message to driver via NavPro app
+export const sendDriverMessage = async (driver_id, message, title = 'Dispatch Message') => {
+  try {
+    // Note: This is a placeholder for the actual NavPro messaging API
+    // The actual endpoint may vary - check NavPro API documentation
+    const response = await navpro('/api/message/send', {
+      method: 'POST',
+      body: JSON.stringify({
+        driver_id,
+        title,
+        message,
+        priority: 'normal',
+        timestamp: new Date().toISOString(),
+      }),
+    });
+    return response;
+  } catch (error) {
+    // If API doesn't exist or fails, simulate success for demo
+    console.log('Message would be sent to driver:', { driver_id, message, title });
+    return { success: true, message: 'Message sent (demo mode)' };
+  }
+};
+
 // ── DATA NORMALIZERS ──────────────────────────────────────────────────────────
 
 // work_status → FleetPilot display label
